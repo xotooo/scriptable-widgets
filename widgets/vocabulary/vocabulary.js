@@ -361,13 +361,11 @@ if (widgetParameter && widgetParameter.startsWith('http')) {
 }
 
 const widget = await createWidget();
-if (typeof config !== 'undefined' && config.runInApp) {
+if (config.runInApp) {
   widget.presentMedium();
 }
-if (typeof Script !== 'undefined') {
-  Script.setWidget(widget);
-  Script.complete();
-}
+Script.setWidget(widget);
+Script.complete();
 
 // ══════════════════════════════════════════
 // WIDGET BUILDER
@@ -448,7 +446,7 @@ function buildSmallWidget(w, data) {
   // Part of speech at bottom
   if (data.pos) {
     const posText = w.addText(data.pos);
-    posText.font = Font.mediumSystemFont(9);
+    posText.font = Font.italicSystemFont ? Font.italicSystemFont(9) : Font.mediumSystemFont(9);
     posText.textColor = CONFIG.accentOrange;
   }
 }
@@ -465,7 +463,7 @@ function buildMediumWidget(w, data) {
   // ── Left: Word & Definition ──
   const leftStack = mainStack.addStack();
   leftStack.layoutVertically();
-  leftStack.size = new Size(190, 0);
+  leftStack.setWidth(190);
 
   // Level badge
   const badgeStack = leftStack.addStack();
@@ -548,7 +546,7 @@ function buildMediumWidget(w, data) {
   // ── Right: Roots & Derivatives ──
   const rightStack = mainStack.addStack();
   rightStack.layoutVertically();
-  rightStack.size = new Size(140, 0);
+  rightStack.setWidth(140);
 
   // Word roots
   if (data.roots && data.roots.length > 0) {
@@ -728,7 +726,7 @@ function buildLargeWidget(w, data) {
   // Left: Roots
   const rootsCol = etymStack.addStack();
   rootsCol.layoutVertically();
-  rootsCol.size = new Size(170, 0);
+  rootsCol.setWidth(170);
 
   const rootsTitle = rootsCol.addText('🔤 Etymology');
   rootsTitle.font = Font.boldSystemFont(10);
@@ -738,7 +736,7 @@ function buildLargeWidget(w, data) {
 
   if (data.literalMeaning) {
     const litText = rootsCol.addText(`"${data.literalMeaning}"`);
-    litText.font = Font.mediumSystemFont(9);
+    litText.font = Font.italicSystemFont ? Font.italicSystemFont(9) : Font.mediumSystemFont(9);
     litText.textColor = new Color('#8b949e', 0.8);
     litText.lineLimit = 1;
   }

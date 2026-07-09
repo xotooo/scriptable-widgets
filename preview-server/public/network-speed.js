@@ -76,11 +76,13 @@ if (widgetParameter && widgetParameter.startsWith('http')) {
 }
 
 const widget = await createWidget();
-if (config.runInApp) {
+if (typeof config !== 'undefined' && config.runInApp) {
   widget.presentMedium();
 }
-Script.setWidget(widget);
-Script.complete();
+if (typeof Script !== 'undefined') {
+  Script.setWidget(widget);
+  Script.complete();
+}
 
 // ══════════════════════════════════════════
 // WIDGET BUILDER
@@ -238,7 +240,7 @@ function buildMediumWidget(w, data) {
   // ── Right column: Details ──
   const rightStack = mainStack.addStack();
   rightStack.layoutVertically();
-  rightStack.setWidth(130);
+  rightStack.size = new Size(130, 0);
   
   // Signal bars
   const signalStack = rightStack.addStack();
@@ -353,7 +355,7 @@ function buildLargeWidget(w, data) {
   // Left details
   const leftDetails = detailsStack.addStack();
   leftDetails.layoutVertically();
-  leftDetails.setWidth(150);
+  leftDetails.size = new Size(150, 0);
   
   const detailsTitle = leftDetails.addText('CONNECTION');
   detailsTitle.font = Font.mediumSystemFont(10);
@@ -438,9 +440,6 @@ function dlStack_layoutContent(stack, label, speed) {
   // Mini bar
   const barStack = stack.addStack();
   barStack.layoutHorizontally();
-  barStack.setHeight(3);
-  barStack.cornerRadius = 1.5;
-  barStack.backgroundColor = new Color('#ffffff', 0.1);
   barStack.size = new Size(130, 3);
 }
 

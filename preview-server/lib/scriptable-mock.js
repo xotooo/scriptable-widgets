@@ -422,12 +422,16 @@ class WidgetStack {
   }
 
   setPadding(left, top, right, bottom) {
+<<<<<<< HEAD
     // Note: Scriptable iOS uses (top, left, bottom, right) order, but many scripts
     // call setPadding(top, left, bottom, right). We support both by checking arg count.
+=======
+>>>>>>> 283ea14 (feat: Scriptable widgets - network speed monitor, vocabulary builder, browser preview server, 48 collected scripts)
     this._padding = { top, left, bottom, right };
     this._updateElement();
   }
 
+<<<<<<< HEAD
   setWidth(width) {
     if (!this._size) this._size = new Size(0, 0);
     this._size = new Size(width, this._size.height || 0);
@@ -440,6 +444,8 @@ class WidgetStack {
     this._updateElement();
   }
 
+=======
+>>>>>>> 283ea14 (feat: Scriptable widgets - network speed monitor, vocabulary builder, browser preview server, 48 collected scripts)
   // Content methods
   addText(text) {
     const w = new WidgetText(text);
@@ -528,11 +534,14 @@ class ListWidget extends WidgetStack {
     this._updateElement();
   }
 
+<<<<<<< HEAD
   // Preview methods (iOS only, no-op in browser)
   presentSmall() {}
   presentMedium() {}
   presentLarge() {}
 
+=======
+>>>>>>> 283ea14 (feat: Scriptable widgets - network speed monitor, vocabulary builder, browser preview server, 48 collected scripts)
   _updateElement() {
     super._updateElement();
     this._element.style.borderRadius = '22px';
