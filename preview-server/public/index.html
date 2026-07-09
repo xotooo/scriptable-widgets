@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scriptable Widget Preview Server</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 20px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .toolbar select, .toolbar button {
+      background: #2a2a4e;
+      color: #e0e0e0;
+      border: 1px solid #3a3a5e;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toolbar select:hover, .toolbar button:hover {
+      background: #3a3a6e;
+      border-color: #5a5a8e;
+    }
+
+    .toolbar button.primary {
+      background: #5b6eff;
+      border-color: #5b6eff;
+      color: white;
+    }
+
+    .toolbar button.primary:hover {
+      background: #4a5ddd;
+    }
+
+    .size-selector {
+      display: flex;
+      gap: 4px;
+    }
+
+    .size-selector button {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .size-selector button.active {
+      background: #5b6eff;
+      border-color: #5b6eff;
+      color: white;
+    }
+
+    .preview-area {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 40px 20px;
+      background: #0f0f1a;
+      border-radius: 16px;
+      min-height: 500px;
+      border: 1px solid #2a2a3e;
+    }
+
+    .widget-frame {
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .widget-frame .label {
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .widget-container {
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      transition: transform 0.2s ease;
+    }
+
+    .widget-container:hover {
+      transform: scale(1.02);
+    }
+
+    /* Widget sizes */
+    .widget-container.size-small {
+      width: 169px;
+      height: 169px;
+    }
+    .widget-container.size-medium {
+      width: 360px;
+      height: 169px;
+    }
+    .widget-container.size-large {
+      width: 360px;
+      height: 379px;
+    }
+
+    /* Widget internal styles */
+    .list-widget {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .widget-stack {
+      display: flex;
+      flex-shrink: 0;
+    }
+
+    .widget-text {
+      line-height: 1.3;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    .widget-spacer {
+      flex-shrink: 0;
+    }
+
+    .widget-image {
+      display: block;
+    }
+
+    /* Log panel */
+    .log-panel {
+      margin-top: 20px;
+      background: #0d1117;
+      border: 1px solid #1e2a3a;
+      border-radius: 12px;
+      padding: 16px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: "SF Mono", "Menlo", monospace;
+      font-size: 12px;
+    }
+
+    .log-panel .log-entry {
+      color: #7ee787;
+      margin-bottom: 2px;
+    }
+
+    .log-panel .log-entry.error {
+      color: #f85149;
+    }
+
+    .log-panel .log-entry.info {
+      color: #79c0ff;
+    }
+
+    /* Collection browser */
+    .collection-browser {
+      margin-top: 30px;
+    }
+
+    .collection-browser h2 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .collection-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .collection-card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4e;
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .collection-card:hover {
+      background: #2a2a4e;
+      border-color: #5b6eff;
+    }
+
+    .collection-card .name {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .collection-card .source {
+      font-size: 11px;
+      color: #666;
+    }
+
+    /* Code viewer */
+    .code-viewer {
+      margin-top: 20px;
+      background: #0d1117;
+      border: 1px solid #1e2a3a;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .code-viewer pre {
+      padding: 16px;
+      overflow-x: auto;
+      font-family: "SF Mono", "Menlo", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #c9d1d9;
+    }
+
+    /* Status indicator */
+    .status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #7ee787;
+      margin-left: 8px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Scriptable Widget Preview Server</h1>
+  <p class="subtitle">无需 iOS 设备，在浏览器中实时渲染和调试 Scriptable 小组件<span class="status"></span></p>
+
+  <div class="toolbar">
+    <select id="widget-select">
+      <option value="network-speed">📊 网速监控 (Network Speed)</option>
+      <option value="vocabulary">📖 背单词 (Vocabulary)</option>
+    </select>
+    
+    <div class="size-selector" id="size-selector">
+      <button data-size="small">小 Small</button>
+      <button data-size="medium" class="active">中 Medium</button>
+      <button data-size="large">大 Large</button>
+      <button data-size="all">全部 All</button>
+    </div>
+
+    <button class="primary" id="refresh-btn">🔄 刷新</button>
+    <button id="view-code">📝 查看代码</button>
+    <button id="view-collection">📚 脚本收藏</button>
+  </div>
+
+  <div class="preview-area" id="preview-area">
+    <!-- Widgets rendered here -->
+  </div>
+
+  <div class="log-panel" id="log-panel">
+    <div class="log-entry info">Preview server ready.</div>
+  </div>
+
+  <div id="dynamic-section"></div>
+
+  <script src="/lib/scriptable-mock.js"></script>
+  <script>
+    // ============================================================
+    // Preview Server Core
+    // ============================================================
+    
+    const widgetModules = {
+      'network-speed': null,
+      'vocabulary': null,
+    };
+
+    const widgetMeta = {
+      'network-speed': {
+        name: '网速监控',
+        file: '/widgets/network-speed/network-speed.js',
+        paramKey: 'network-speed-params'
+      },
+      'vocabulary': {
+        name: '背单词',
+        file: '/widgets/vocabulary/vocabulary.js',
+        paramKey: 'vocabulary-params'
+      }
+    };
+
+    let currentWidget = 'network-speed';
+    let currentSize = 'medium';
+
+    function addLog(message, type = 'log') {
+      const panel = document.getElementById('log-panel');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry ' + (type === 'error' ? 'error' : type === 'info' ? 'info' : '');
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      panel.appendChild(entry);
+      panel.scrollTop = panel.scrollHeight;
+    }
+
+    async function renderWidget(widgetKey, size) {
+      const meta = widgetMeta[widgetKey];
+      if (!meta) return;
+
+      try {
+        // Load widget script
+        const response = await fetch(meta.file);
+        const code = await response.text();
+        
+        // Create isolated scope
+        const moduleCode = `
+          (function() {
+            const module = { exports: {} };
+            const exports = module.exports;
+            ${code}
+            return (typeof createWidget !== 'undefined') ? createWidget : 
+                   (typeof module.exports.createWidget !== 'undefined') ? module.exports.createWidget :
+                   (typeof module.exports.default !== 'undefined') ? module.exports.default : null;
+          })();
+        `;
+
+        const factory = eval(moduleCode);
+        if (!factory) {
+          throw new Error('No createWidget function found');
+        }
+
+        // Set config.widgetFamily
+        const sizes = { small: '169x169', medium: '360x169', large: '360x379' };
+        
+        // Call factory
+        const config = {
+          widgetFamily: size,
+          runInBackground: false,
+          widgetParameter: localStorage.getItem(meta.paramKey) || '',
+          useUserLocation: false,
+        };
+
+        const widget = typeof factory === 'function' 
+          ? await factory(config) 
+          : await factory.createWidget(config);
+
+        if (!widget) throw new Error('Widget factory returned null');
+
+        // Render
+        const container = document.createElement('div');
+        container.className = `widget-container size-${size}`;
+        container.appendChild(widget.element.cloneNode(true));
+        
+        // Re-run the element tree setup
+        renderWidgetElement(widget, container);
+
+        return container;
+
+      } catch (err) {
+        addLog('Error: ' + err.message, 'error');
+        console.error(err);
+        const errorDiv = document.createElement('div');
+        errorDiv.className = `widget-container size-${size}`;
+        errorDiv.innerHTML = `<div style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;color:#f85149;font-size:12px;padding:16px;">Error: ${err.message}</div>`;
+        return errorDiv;
+      }
+    }
+
+    function renderWidgetElement(widget, container) {
+      // Recursively clone elements into container
+      container.innerHTML = '';
+      const clone = widget.element.cloneNode(true);
+      container.appendChild(clone);
+    }
+
+    async function refresh() {
+      const area = document.getElementById('preview-area');
+      area.innerHTML = '';
+
+      const sizes = currentSize === 'all' ? ['small', 'medium', 'large'] : [currentSize];
+      
+      for (const size of sizes) {
+        const frame = document.createElement('div');
+        frame.className = 'widget-frame';
+        
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = size;
+        frame.appendChild(label);
+
+        const widget = await renderWidget(currentWidget, size);
+        if (widget) frame.appendChild(widget);
+
+        area.appendChild(frame);
+      }
+
+      addLog(`Rendered ${currentWidget} at ${sizes.join(', ')}`);
+    }
+
+    // ============================================================
+    // UI Events
+    // ============================================================
+    
+    document.getElementById('widget-select').addEventListener('change', (e) => {
+      currentWidget = e.target.value;
+      refresh();
+    });
+
+    document.querySelectorAll('#size-selector button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#size-selector button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentSize = btn.dataset.size;
+        refresh();
+      });
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', refresh);
+
+    document.getElementById('view-code').addEventListener('click', async () => {
+      const meta = widgetMeta[currentWidget];
+      const section = document.getElementById('dynamic-section');
+      const response = await fetch(meta.file);
+      const code = await response.text();
+      
+      section.innerHTML = `
+        <div class="code-viewer">
+          <pre><code>${escapeHtml(code)}</code></pre>
+        </div>
+      `;
+      section.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('view-collection').addEventListener('click', async () => {
+      const section = document.getElementById('dynamic-section');
+      
+      try {
+        const response = await fetch('/api/collection');
+        const items = await response.json();
+        
+        let html = '<div class="collection-browser"><h2>📚 脚本收藏 (' + items.length + ' scripts)</h2><div class="collection-grid">';
+        for (const item of items) {
+          html += `<div class="collection-card" onclick="viewCollectionScript('${item.path}')">
+            <div class="name">${item.name}</div>
+            <div class="source">${item.source}</div>
+          </div>`;
+        }
+        html += '</div></div>';
+        section.innerHTML = html;
+        section.scrollIntoView({ behavior: 'smooth' });
+      } catch(e) {
+        addLog('Failed to load collection: ' + e.message, 'error');
+      }
+    });
+
+    window.viewCollectionScript = async function(path) {
+      const section = document.getElementById('dynamic-section');
+      const response = await fetch('/api/file/' + encodeURIComponent(path));
+      const code = await response.text();
+      section.innerHTML = `<div class="code-viewer"><pre><code>${escapeHtml(code)}</code></pre></div>`;
+      section.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ============================================================
+    // Auto-refresh
+    // ============================================================
+    setInterval(() => {
+      if (currentWidget === 'network-speed') {
+        refresh();
+      }
+    }, 5000);
+
+    // Initial render
+    refresh();
+  </script>
+</body>
+</html>
