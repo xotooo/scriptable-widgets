@@ -422,7 +422,21 @@ class WidgetStack {
   }
 
   setPadding(left, top, right, bottom) {
+    // Note: Scriptable iOS uses (top, left, bottom, right) order, but many scripts
+    // call setPadding(top, left, bottom, right). We support both by checking arg count.
     this._padding = { top, left, bottom, right };
+    this._updateElement();
+  }
+
+  setWidth(width) {
+    if (!this._size) this._size = new Size(0, 0);
+    this._size = new Size(width, this._size.height || 0);
+    this._updateElement();
+  }
+
+  setHeight(height) {
+    if (!this._size) this._size = new Size(0, 0);
+    this._size = new Size(this._size.width || 0, height);
     this._updateElement();
   }
 
@@ -513,6 +527,11 @@ class ListWidget extends WidgetStack {
     this._layout = 'vertical';
     this._updateElement();
   }
+
+  // Preview methods (iOS only, no-op in browser)
+  presentSmall() {}
+  presentMedium() {}
+  presentLarge() {}
 
   _updateElement() {
     super._updateElement();
