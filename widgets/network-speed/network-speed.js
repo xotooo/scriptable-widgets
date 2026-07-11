@@ -293,7 +293,7 @@ function buildMediumWidget(w, data) {
   // IP at bottom
   if (data.ip) {
     const ipText = rightStack.addText(data.ip);
-    ipText.font = Font.monospacedSystemFont(9, 'regular');
+    ipText.font = new Font('SF Mono', 9);
     ipText.textColor = new Color('#ffffff', 0.3);
     ipText.lineLimit = 1;
   }
@@ -316,7 +316,7 @@ function buildLargeWidget(w, data) {
   titleStack.addSpacer();
   
   const time = titleStack.addText(formatTime(new Date()));
-  time.font = Font.monospacedSystemFont(10, 'regular');
+  time.font = new Font('SF Mono', 10);
   time.textColor = new Color('#ffffff', 0.4);
   
   w.addSpacer(12);
