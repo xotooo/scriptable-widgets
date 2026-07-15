@@ -17,10 +17,10 @@
  * Supports: small, medium, large widget families
  * 
  * Data Source:
- *   - Fetches from vocab-api Cloudflare Worker (500 software industry words)
- *   - API: https://vocab-api.xoto.workers.dev/api/today
- *   - Falls back to built-in word list if API is unreachable
- *   - Set widget parameter to override API URL
+ *   - Fetches full word list (500 words) from vocab-api Worker once per day
+ *   - Caches to .cache/vocabulary-words.json for zero-latency widget renders
+ *   - Falls back to built-in word list if both network and cache fail
+ *   - API: https://vocab-api.xoto.workers.dev/api/words?detail=1
  * 
  * Usage on iOS:
  *   1. Install Scriptable app
@@ -34,9 +34,13 @@
 // ══════════════════════════════════════════
 
 const CONFIG = {
-  // API URL for fetching word data (must return JSON matching the format below)
-  // Points to the vocab-api Cloudflare Worker
-  apiUrl: 'https://vocab-api.xoto.workers.dev/api/today',
+  // Base API URL — vocab-api Cloudflare Worker
+  apiBase: 'https://vocab-api.xoto.workers.dev/api',
+  
+  // Cache: full word list fetched once per day, stored in .cache/
+  // Subsequent widget renders read from disk — zero network latency
+  cacheDir: '.cache',
+  cacheFile: 'vocabulary-words.json',
   
   // Colors
   bgGradient: [
@@ -869,45 +873,85 @@ function getDayOfYear() {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-function getWordIndex() {
-  return getDayOfYear() % WORD_LIST.length;
+function getWordIndex(total) {
+  if (!total || total < 1) total = WORD_LIST.length;
+  return getDayOfYear() % total;
 }
 
 // ══════════════════════════════════════════
-// DATA FETCHING
+// DATA FETCHING — daily cache strategy
 // ══════════════════════════════════════════
 
+const todayStr = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+/**
+ * Cache layout on disk (.cache/vocabulary-words.json):
+ *   { "date": "2026-07-15", "words": [ {word...}, ... ] }
+ *
+ * Strategy:
+ *   1. Read cache file; if date == today → use it, zero network
+ *   2. If stale or missing → fetch GET /api/words?detail=1 (full 500 words)
+ *      → save to cache → use it
+ *   3. If network fails but cache exists → use stale cache
+ *   4. If no cache & no network → fall back to built-in WORD_LIST
+ */
 async function getWordData() {
-  // If API URL configured, fetch real data
-  if (CONFIG.apiUrl) {
-    try {
-      const req = new Request(CONFIG.apiUrl);
-      req.timeoutInterval = 10;
-      const res = await req.loadJSON();
-      // vocab-api returns { index, total, date, word: { word, phonetic, ... } }
-      // Unwrap the word object; fall back to raw response if already flat
-      if (res && res.word && typeof res.word === 'object') {
-        return res.word;
-      }
-      // If the response is already a flat word object, return as-is
-      if (res && res.word && typeof res.word === 'string') {
-        return res;
-      }
-    } catch (e) {
-      console.log('Fetch error: ' + e);
+  const cachePath = `${CONFIG.cacheDir}/${CONFIG.cacheFile}`;
+
+  // ── Step 1: Try reading from local cache ──
+  let cached = null;
+  try {
+    const fm = FileManager.local();
+    const full = fm.joinPath(fm.documentsDirectory(), cachePath);
+    if (fm.fileExists(full)) {
+      cached = JSON.parse(fm.readString(full));
     }
+  } catch (e) {
+    // Scriptable FileManager not available (e.g. browser preview)
   }
 
-  // Browser preview: try fetching from preview server
-  if (typeof fetch !== 'undefined' && typeof window !== 'undefined') {
+  // Browser preview path: use in-memory / fetch
+  if (cached === null && typeof fetch !== 'undefined' && typeof window !== 'undefined') {
     try {
       const res = await fetch('/api/vocabulary/today');
       if (res.ok) return await res.json();
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) { /* fall through */ }
   }
 
-  // Built-in word list fallback
+  // Cache is fresh → pick today's word from it
+  if (cached && cached.date === todayStr() && Array.isArray(cached.words) && cached.words.length > 0) {
+    return cached.words[getWordIndex(cached.words.length)];
+  }
+
+  // ── Step 2: Cache stale or missing → fetch full word list ──
+  try {
+    const req = new Request(`${CONFIG.apiBase}/words?detail=1`);
+    req.timeoutInterval = 15;
+    const res = await req.loadJSON();
+    // /api/words?detail=1 returns { total: N, words: [ {word, phonetic, ...}, ... ] }
+    if (res && Array.isArray(res.words) && res.words.length > 0) {
+      const payload = { date: todayStr(), words: res.words };
+      // Persist to cache
+      try {
+        const fm = FileManager.local();
+        const dir = fm.joinPath(fm.documentsDirectory(), CONFIG.cacheDir);
+        if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+        const full = fm.joinPath(dir, CONFIG.cacheFile);
+        fm.writeString(full, JSON.stringify(payload));
+      } catch (e) {
+        // Can't write cache — still use the fetched data this render
+      }
+      return res.words[getWordIndex(res.words.length)];
+    }
+  } catch (e) {
+    console.log('Network fetch error: ' + e);
+  }
+
+  // ── Step 3: Network failed but stale cache exists → use it ──
+  if (cached && Array.isArray(cached.words) && cached.words.length > 0) {
+    return cached.words[getWordIndex(cached.words.length)];
+  }
+
+  // ── Step 4: No cache & no network → built-in fallback ──
   return WORD_LIST[getWordIndex()];
 }
