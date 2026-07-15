@@ -17,8 +17,10 @@
  * Supports: small, medium, large widget families
  * 
  * Data Source:
- *   - Uses a built-in word list with 100+ curated words
- *   - Can also fetch from a custom API (set widget parameter to URL)
+ *   - Fetches from vocab-api Cloudflare Worker (500 software industry words)
+ *   - API: https://vocab-api.xoto.workers.dev/api/today
+ *   - Falls back to built-in word list if API is unreachable
+ *   - Set widget parameter to override API URL
  * 
  * Usage on iOS:
  *   1. Install Scriptable app
@@ -33,8 +35,8 @@
 
 const CONFIG = {
   // API URL for fetching word data (must return JSON matching the format below)
-  // Leave empty to use built-in word list
-  apiUrl: '',
+  // Points to the vocab-api Cloudflare Worker
+  apiUrl: 'https://vocab-api.xoto.workers.dev/api/today',
   
   // Colors
   bgGradient: [
@@ -361,11 +363,13 @@ if (widgetParameter && widgetParameter.startsWith('http')) {
 }
 
 const widget = await createWidget();
-if (config.runInApp) {
+if (typeof config !== 'undefined' && config.runInApp) {
   widget.presentMedium();
 }
-Script.setWidget(widget);
-Script.complete();
+if (typeof Script !== 'undefined') {
+  Script.setWidget(widget);
+  Script.complete();
+}
 
 // ══════════════════════════════════════════
 // WIDGET BUILDER
@@ -446,7 +450,7 @@ function buildSmallWidget(w, data) {
   // Part of speech at bottom
   if (data.pos) {
     const posText = w.addText(data.pos);
-    posText.font = Font.italicSystemFont ? Font.italicSystemFont(9) : Font.mediumSystemFont(9);
+    posText.font = Font.mediumSystemFont(9);
     posText.textColor = CONFIG.accentOrange;
   }
 }
@@ -463,7 +467,7 @@ function buildMediumWidget(w, data) {
   // ── Left: Word & Definition ──
   const leftStack = mainStack.addStack();
   leftStack.layoutVertically();
-  leftStack.setWidth(190);
+  leftStack.size = new Size(190, 0);
 
   // Level badge
   const badgeStack = leftStack.addStack();
@@ -546,7 +550,7 @@ function buildMediumWidget(w, data) {
   // ── Right: Roots & Derivatives ──
   const rightStack = mainStack.addStack();
   rightStack.layoutVertically();
-  rightStack.setWidth(140);
+  rightStack.size = new Size(140, 0);
 
   // Word roots
   if (data.roots && data.roots.length > 0) {
@@ -726,7 +730,7 @@ function buildLargeWidget(w, data) {
   // Left: Roots
   const rootsCol = etymStack.addStack();
   rootsCol.layoutVertically();
-  rootsCol.setWidth(170);
+  rootsCol.size = new Size(170, 0);
 
   const rootsTitle = rootsCol.addText('🔤 Etymology');
   rootsTitle.font = Font.boldSystemFont(10);
@@ -736,7 +740,7 @@ function buildLargeWidget(w, data) {
 
   if (data.literalMeaning) {
     const litText = rootsCol.addText(`"${data.literalMeaning}"`);
-    litText.font = Font.italicSystemFont ? Font.italicSystemFont(9) : Font.mediumSystemFont(9);
+    litText.font = Font.mediumSystemFont(9);
     litText.textColor = new Color('#8b949e', 0.8);
     litText.lineLimit = 1;
   }
@@ -878,7 +882,17 @@ async function getWordData() {
   if (CONFIG.apiUrl) {
     try {
       const req = new Request(CONFIG.apiUrl);
-      return await req.loadJSON();
+      req.timeoutInterval = 10;
+      const res = await req.loadJSON();
+      // vocab-api returns { index, total, date, word: { word, phonetic, ... } }
+      // Unwrap the word object; fall back to raw response if already flat
+      if (res && res.word && typeof res.word === 'object') {
+        return res.word;
+      }
+      // If the response is already a flat word object, return as-is
+      if (res && res.word && typeof res.word === 'string') {
+        return res;
+      }
     } catch (e) {
       console.log('Fetch error: ' + e);
     }
@@ -894,6 +908,6 @@ async function getWordData() {
     }
   }
 
-  // Built-in word list
+  // Built-in word list fallback
   return WORD_LIST[getWordIndex()];
 }
